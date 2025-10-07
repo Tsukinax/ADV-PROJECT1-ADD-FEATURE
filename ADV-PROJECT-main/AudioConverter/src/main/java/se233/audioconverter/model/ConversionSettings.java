@@ -113,6 +113,34 @@ public class ConversionSettings {
             return String.format("%s (%d kbps)", label, bitrate);
         }
     }
+    // เพิ่ม Quality preset สำหรับ M4A
+    public enum M4AQuality {
+        ECONOMY("Economy", 64),
+        STANDARD("Standard", 128),
+        GOOD("Good", 160),
+        BEST("Best", 256);
+
+        private final String label;
+        private final int bitrate;
+
+        M4AQuality(String label, int bitrate) {
+            this.label = label;
+            this.bitrate = bitrate;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+
+        public int getBitrate() {
+            return bitrate;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("%s (%d kbps)", label, bitrate);
+        }
+    }
 
     public enum SampleRate {
         SR_8000("8000 Hz", 8000),

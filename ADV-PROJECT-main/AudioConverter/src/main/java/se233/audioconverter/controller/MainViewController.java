@@ -17,11 +17,11 @@ import javafx.scene.input.TransferMode;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.HBox;
-import javafx.stage.DirectoryChooser;
-import javafx.stage.FileChooser;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.geometry.Pos;
+import javafx.stage.DirectoryChooser;
+import javafx.stage.FileChooser;
 
 import java.io.File;
 import java.io.IOException;
@@ -127,12 +127,12 @@ public class MainViewController {
                 } else {
                     // สร้าง HBox สำหรับแสดงชื่อไฟล์และปุ่มลบ
                     HBox hbox = new HBox(10);
-                    hbox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+                    hbox.setAlignment(Pos.CENTER_LEFT);
 
                     // Label แสดงชื่อไฟล์
                     Label fileLabel = new Label(item.getName() + " (" + item.getFormat().toUpperCase() + ")");
                     fileLabel.setMaxWidth(Double.MAX_VALUE);
-                    HBox.setHgrow(fileLabel, javafx.scene.layout.Priority.ALWAYS);
+                    HBox.setHgrow(fileLabel, Priority.ALWAYS);
 
                     // ปุ่มลบ
                     Button deleteButton = new Button("×");
@@ -201,13 +201,27 @@ public class MainViewController {
 
         qualitySlider.valueProperty().addListener((obs, oldVal, newVal) -> {
             int index = newVal.intValue();
-            ConversionSettings.Quality quality = ConversionSettings.Quality.values()[index];
-            settings.setQuality(quality);
-            qualityLabel.setText(String.format("%s (%d kbps)",
-                    quality.getLabel(), quality.getBitrate()));
+            ConversionSettings.OutputFormat format = settings.getOutputFormat();
 
-            if (settings.getOutputFormat().supportsBitrate()) {
-                bitrateComboBox.setValue(quality.getBitrate());
+            if (format == ConversionSettings.OutputFormat.M4A) {
+                // ใช้ M4A Quality
+                ConversionSettings.M4AQuality quality = ConversionSettings.M4AQuality.values()[index];
+                qualityLabel.setText(String.format("%s (%d kbps)",
+                        quality.getLabel(), quality.getBitrate()));
+                settings.setCustomBitrate(quality.getBitrate());
+                if (bitrateComboBox != null) {
+                    bitrateComboBox.setValue(quality.getBitrate());
+                }
+            } else {
+                // ใช้ Quality ปกติสำหรับ MP3
+                ConversionSettings.Quality quality = ConversionSettings.Quality.values()[index];
+                settings.setQuality(quality);
+                qualityLabel.setText(String.format("%s (%d kbps)",
+                        quality.getLabel(), quality.getBitrate()));
+
+                if (settings.getOutputFormat().supportsBitrate() && bitrateComboBox != null) {
+                    bitrateComboBox.setValue(quality.getBitrate());
+                }
             }
         });
         qualityLabel.setText("Good (192 kbps)");
@@ -301,6 +315,10 @@ public class MainViewController {
         presetComboBox.setItems(FXCollections.observableArrayList(
                 ConversionPreset.values()));
 
+        // ตั้งค่า default เป็น None
+        presetComboBox.setValue(ConversionPreset.NONE);
+        presetDescriptionLabel.setText(ConversionPreset.NONE.getDescription());
+
         presetComboBox.setOnAction(e -> {
             ConversionPreset selected = presetComboBox.getValue();
             if (selected != null) {
@@ -343,18 +361,32 @@ public class MainViewController {
 
             int presetBitrate = preset.getBitrate();
 
-            ConversionSettings.Quality matchedQuality = null;
-            for (ConversionSettings.Quality q : ConversionSettings.Quality.values()) {
-                if (q.getBitrate() == presetBitrate) {
-                    matchedQuality = q;
-                    break;
+            if (preset.getFormat() == ConversionSettings.OutputFormat.M4A) {
+                // หา M4A Quality ที่ตรงกับ bitrate
+                for (int i = 0; i < ConversionSettings.M4AQuality.values().length; i++) {
+                    ConversionSettings.M4AQuality q = ConversionSettings.M4AQuality.values()[i];
+                    if (q.getBitrate() == presetBitrate) {
+                        qualitySlider.setValue(i);
+                        qualityLabel.setText(String.format("%s (%d kbps)",
+                                q.getLabel(), q.getBitrate()));
+                        break;
+                    }
                 }
-            }
+            } else {
+                // หา Quality ปกติสำหรับ MP3
+                ConversionSettings.Quality matchedQuality = null;
+                for (ConversionSettings.Quality q : ConversionSettings.Quality.values()) {
+                    if (q.getBitrate() == presetBitrate) {
+                        matchedQuality = q;
+                        break;
+                    }
+                }
 
-            if (matchedQuality != null) {
-                qualitySlider.setValue(matchedQuality.ordinal());
-                qualityLabel.setText(String.format("%s (%d kbps)",
-                        matchedQuality.getLabel(), matchedQuality.getBitrate()));
+                if (matchedQuality != null) {
+                    qualitySlider.setValue(matchedQuality.ordinal());
+                    qualityLabel.setText(String.format("%s (%d kbps)",
+                            matchedQuality.getLabel(), matchedQuality.getBitrate()));
+                }
             }
         }
 
@@ -429,6 +461,25 @@ public class MainViewController {
             formatInfoLabel.setText("Lossy compression format");
         } else {
             formatInfoLabel.setText("Lossless format");
+        }
+
+        // อัปเดต Quality Slider ตามรูปแบบ
+        if (format == ConversionSettings.OutputFormat.M4A) {
+            // M4A: Economy 64, Standard 128, Good 160, Best 256
+            qualitySlider.setValue(2); // Default: Good (160)
+            qualityLabel.setText("Good (160 kbps)");
+            settings.setCustomBitrate(160);
+            if (bitrateComboBox != null) {
+                bitrateComboBox.setValue(160);
+            }
+        } else if (format == ConversionSettings.OutputFormat.MP3) {
+            // MP3: Economy 64, Standard 128, Good 192, Best 320
+            qualitySlider.setValue(2); // Default: Good (192)
+            qualityLabel.setText("Good (192 kbps)");
+            settings.setQuality(ConversionSettings.Quality.GOOD);
+            if (bitrateComboBox != null) {
+                bitrateComboBox.setValue(192);
+            }
         }
 
         if (format == ConversionSettings.OutputFormat.WAV) {
